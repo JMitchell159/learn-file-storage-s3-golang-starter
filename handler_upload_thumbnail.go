@@ -2,10 +2,10 @@ package main
 
 import (
 	"database/sql"
-	"encoding/base64"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/auth"
@@ -51,12 +51,6 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 	}
 	defer file.Close()
 
-	dat, err := io.ReadAll(file)
-	if err != nil {
-		respondWithError(w, 500, "Unable to read file", err)
-		return
-	}
-
 	video, err := cfg.db.GetVideo(videoID)
 	if err == sql.ErrNoRows {
 		respondWithError(w, 404, "Video does not exist", err)
@@ -70,16 +64,23 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 	}
 
 	split := strings.Split(header.Filename, ".")
-	t := strings.Join(split[1:], ".")
-	full := fmt.Sprintf("image/%s", t)
-	result := thumbnail{
-		data:      dat,
-		mediaType: full,
+	ext := strings.Join(split[1:], ".")
+
+	fileName := fmt.Sprintf("%s/%s.%s", cfg.assetsRoot, videoID.String(), ext)
+	f, err := os.Create(fileName)
+	if err != nil {
+		respondWithError(w, 500, "Unable to create file for thumbnail", err)
+		return
+	}
+	defer f.Close()
+
+	_, err = io.Copy(f, file)
+	if err != nil {
+		respondWithError(w, 500, "Unable to copy thumbnail data to new file", err)
+		return
 	}
 
-	data := base64.StdEncoding.EncodeToString(result.data)
-
-	tb := fmt.Sprintf("data:%s;base64,%s", result.mediaType, data)
+	tb := fmt.Sprintf("http://localhost:8091%s", fileName[1:])
 	video.ThumbnailURL = &tb
 	err = cfg.db.UpdateVideo(video)
 	if err != nil {
