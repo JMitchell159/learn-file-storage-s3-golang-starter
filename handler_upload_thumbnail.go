@@ -1,7 +1,9 @@
 package main
 
 import (
+	"crypto/rand"
 	"database/sql"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"mime"
@@ -75,7 +77,15 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	fileName := fmt.Sprintf("%s/%s.%s", cfg.assetsRoot, videoID.String(), ext)
+	b := make([]byte, 32)
+	_, err = rand.Read(b)
+	if err != nil {
+		respondWithError(w, 500, "Unable to create thumbnail ID", err)
+	}
+
+	id := base64.RawURLEncoding.EncodeToString(b)
+
+	fileName := fmt.Sprintf("%s/%s.%s", cfg.assetsRoot, id, ext)
 	f, err := os.Create(fileName)
 	if err != nil {
 		respondWithError(w, 500, "Unable to create file for thumbnail", err)
