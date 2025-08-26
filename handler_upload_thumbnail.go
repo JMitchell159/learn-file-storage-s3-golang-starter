@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"os"
 	"strings"
@@ -63,8 +64,16 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	split := strings.Split(header.Filename, ".")
+	name, _, err := mime.ParseMediaType(header.Filename)
+	split := strings.Split(name, ".")
 	ext := strings.Join(split[1:], ".")
+	if err != nil {
+		respondWithError(w, 500, "Unable to parse media type", err)
+		return
+	} else if ext != "jpeg" && ext != "png" {
+		respondWithError(w, 422, "Wrong file format for thumbnail", nil)
+		return
+	}
 
 	fileName := fmt.Sprintf("%s/%s.%s", cfg.assetsRoot, videoID.String(), ext)
 	f, err := os.Create(fileName)
