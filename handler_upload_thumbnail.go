@@ -81,6 +81,7 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 	_, err = rand.Read(b)
 	if err != nil {
 		respondWithError(w, 500, "Unable to create thumbnail ID", err)
+		return
 	}
 
 	id := base64.RawURLEncoding.EncodeToString(b)
