@@ -1,8 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"os"
+	"os/exec"
 
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/auth"
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/database"
@@ -117,4 +121,43 @@ func (cfg *apiConfig) handlerVideosRetrieve(w http.ResponseWriter, r *http.Reque
 	}
 
 	respondWithJSON(w, http.StatusOK, videos)
+}
+
+func getVideoAspectRatio(filePath string) (string, error) {
+	type resultVals struct {
+		Streams []struct {
+			Width  int `json:"width,omitempty"`
+			Height int `json:"height,omitempty"`
+		} `json:"streams"`
+	}
+
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		return "", fmt.Errorf("%s does not exist", filePath)
+	}
+
+	cmd := exec.Command("ffprobe", "-v", "error", "-print_format", "json", "-show_streams", filePath)
+
+	var buff bytes.Buffer
+	cmd.Stdout = &buff
+	err := cmd.Run()
+	if err != nil {
+		return "", fmt.Errorf("error when running exec command: %v", err)
+	}
+
+	result := &resultVals{}
+	err = json.Unmarshal((&buff).Bytes(), result)
+	if err != nil {
+		return "", fmt.Errorf("error when unmarshaling into struct: %v", err)
+	}
+
+	h := result.Streams[0].Height
+	w := result.Streams[0].Width
+	ratioBy144 := float64(w) / float64(h) * 144
+	if ratioBy144 > 72 && ratioBy144 < 90 {
+		return "9:16", nil
+	} else if ratioBy144 > 240 && ratioBy144 < 272 {
+		return "16:9", nil
+	} else {
+		return "other", nil
+	}
 }
