@@ -78,7 +78,7 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		respondWithError(w, 500, "Unable to create temp file", err)
 		return
 	}
-	defer os.Remove("tubely-upload.mp4")
+	defer os.Remove(temp.Name())
 	defer temp.Close()
 
 	_, err = io.Copy(temp, file)
@@ -93,7 +93,21 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	ratio, err := getVideoAspectRatio(temp.Name())
+	out, err := processVideoForFastStart(temp.Name())
+	if err != nil {
+		respondWithError(w, 500, "Unable to create preprocessed version of video", err)
+		return
+	}
+
+	outFile, err := os.Open(out)
+	if err != nil {
+		respondWithError(w, 500, "Unable to open preprocessed video file", err)
+		return
+	}
+	defer os.Remove(out)
+	defer outFile.Close()
+
+	ratio, err := getVideoAspectRatio(out)
 	if err != nil {
 		respondWithError(w, 500, "Unable to retrieve aspect ratio of video", err)
 		return
@@ -119,7 +133,7 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 	params := &s3.PutObjectInput{
 		Bucket:      &cfg.s3Bucket,
 		Key:         &key,
-		Body:        temp,
+		Body:        outFile,
 		ContentType: &mime_type,
 	}
 	_, err = cfg.s3Client.PutObject(r.Context(), params)
