@@ -142,11 +142,11 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	url := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", cfg.s3Bucket, cfg.s3Region, key)
+	url := fmt.Sprintf("%s/%s", cfg.s3CfDistribution, key)
 	video.VideoURL = &url
 	err = cfg.db.UpdateVideo(video)
 	if err != nil {
-		respondWithError(w, 500, "Unable to update video URL", err)
+		respondWithError(w, 500, "Unable to update video with new URL", err)
 		return
 	}
 
